@@ -38,10 +38,10 @@ def main():
     print(f"Using device: {device}")
 
     # Load the YOLO 11m model with pretrained weights
-    model = YOLO('yolo11m.pt', verbose= True).to(device)
+    model = YOLO('yolo11n.pt', verbose= True).to(device)
     dataset = os.path.join(current_directory,'labeled_image_data/data.yaml')
     epochs = 100
-    results_name = 'Original dataset 100 epochs YOLO M'
+    results_name = 'Original dataset 100 epochs'
     train(model, dataset, epochs, results_name)
 
 main()

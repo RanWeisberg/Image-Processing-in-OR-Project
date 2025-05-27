@@ -1,0 +1,21 @@
+{
+  "categories": [
+    {
+      "id": 0,
+      "name": "Empty"
+    },
+    {
+      "id": 1,
+      "name": "Tweezers"
+    },
+    {
+      "id": 2,
+      "name": "Needle_driver"
+    }
+  ],
+  "info": {
+    "year": 2024,
+    "version": "1.0",
+    "contributor": "Label Studio"
+  }
+}

@@ -1,81 +1,119 @@
 import os
-import shutil
-from collections import defaultdict, Counter
+from collections import Counter
 from glob import glob
 import random
 import matplotlib.pyplot as plt
 
-# === Config ===
-LABEL_DIR = 'labeled_image_data/labels/train'
-IMAGE_DIR = 'labeled_image_data/images/train'
-BALANCED_ROOT = 'balanced_dataset'
-BALANCED_IMAGE_DIR = os.path.join(BALANCED_ROOT, 'images', 'train')
-BALANCED_LABEL_DIR = os.path.join(BALANCED_ROOT, 'labels', 'train')
+# === CONFIGURATION ===
+DATASET_DIR = 'labeled_image_data'
+PLOT_DIR = os.path.join(DATASET_DIR, 'distribution_plots')
+IMAGE_EXT = '.jpg'
+SETS = ['train', 'val']
 
-# === Step 1: Analyze class distribution ===
-def analyze_class_distribution(label_dir):
+IMAGE_DIR = lambda s: os.path.join(DATASET_DIR, 'images', s)
+LABEL_DIR = lambda s: os.path.join(DATASET_DIR, 'labels', s)
+
+# === UTILITIES ===
+def parse_labels(label_path):
+    try:
+        with open(label_path, 'r') as f:
+            return [int(line.split()[0]) for line in f if line.strip()]
+    except:
+        return []
+
+def collect_samples():
+    dataset = {'train': [], 'val': []}
+    for split in SETS:
+        label_files = glob(os.path.join(LABEL_DIR(split), '*.txt'))
+        for label_path in label_files:
+            img_name = os.path.basename(label_path).replace('.txt', IMAGE_EXT)
+            img_path = os.path.join(IMAGE_DIR(split), img_name)
+            if not os.path.exists(img_path):
+                continue
+            class_ids = parse_labels(label_path)
+            if class_ids:
+                dataset[split].append({'image': img_path, 'label': label_path, 'classes': class_ids})
+    return dataset
+
+def compute_class_distribution(samples):
     class_counts = Counter()
-    label_map = defaultdict(list)  # class_id -> list of label file paths
+    for item in samples:
+        class_counts.update(item['classes'])
+    return class_counts
 
-    label_files = glob(os.path.join(label_dir, '*.txt'))
+def report_distribution(samples, title, save_path=None):
+    class_counts = compute_class_distribution(samples)
 
-    for label_file in label_files:
-        with open(label_file, 'r') as f:
-            lines = f.readlines()
-            for line in lines:
-                class_id = int(line.strip().split()[0])
-                class_counts[class_id] += 1
-                label_map[class_id].append(label_file)
+    print(f"\n📊 {title}")
+    print(f"Total samples: {len(samples)}")
+    print(f"Total annotations: {sum(class_counts.values())}")
 
-    print("\n📊 Class Distribution Report:")
+    if not class_counts:
+        print("No classes found!")
+        return
+
+    sorted_classes = sorted(class_counts.keys())
     total = sum(class_counts.values())
-    for cls_id, count in sorted(class_counts.items()):
-        print(f"Class {cls_id}: {count} ({100 * count / total:.2f}%)")
 
-    # Optional: plot bar chart
-    plt.bar(class_counts.keys(), class_counts.values())
-    plt.xlabel("Class ID")
-    plt.ylabel("Count")
-    plt.title("Class Distribution")
-    plt.show()
+    for cls in sorted_classes:
+        count = class_counts[cls]
+        pct = count / total * 100 if total > 0 else 0
+        print(f"  Class {cls}: {count:6d} ({pct:5.1f}%)")
 
-    return class_counts, label_map
+    if save_path and class_counts:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.figure(figsize=(8, 5))
+        classes = list(sorted_classes)
+        counts = [class_counts[c] for c in classes]
 
-# === Step 2: Create a balanced dataset ===
-def create_balanced_dataset(label_map, class_counts):
-    # Create new folders
-    os.makedirs(BALANCED_IMAGE_DIR, exist_ok=True)
-    os.makedirs(BALANCED_LABEL_DIR, exist_ok=True)
+        bars = plt.bar(classes, counts, color='lightgreen', edgecolor='black', alpha=0.75)
+        for bar, count in zip(bars, counts):
+            plt.text(bar.get_x() + bar.get_width() / 2., bar.get_height(),
+                     f'{count}', ha='center', va='bottom')
 
-    # Target count is the minimum across all classes
-    target_count = min(class_counts.values())
-    print(f"\n📦 Balancing dataset to {target_count} samples per class")
+        plt.xlabel("Class ID")
+        plt.ylabel("Count")
+        plt.title(title)
+        plt.grid(axis='y', linestyle='--', alpha=0.4)
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=150)
+        plt.close()
 
-    used_files = set()
-    for class_id, files in label_map.items():
-        selected_files = random.sample(list(set(files)), target_count)
-        for label_file in selected_files:
-            if label_file in used_files:
-                continue  # avoid duplicate copies if label has multiple class lines
-            used_files.add(label_file)
+def compare_distributions(train_samples, val_samples):
+    train_dist = compute_class_distribution(train_samples)
+    val_dist = compute_class_distribution(val_samples)
 
-            # Copy label
-            filename = os.path.basename(label_file)
-            dst_label = os.path.join(BALANCED_LABEL_DIR, filename)
-            shutil.copy(label_file, dst_label)
+    all_classes = sorted(set(train_dist.keys()) | set(val_dist.keys()))
+    train_total = sum(train_dist.values())
+    val_total = sum(val_dist.values())
 
-            # Copy corresponding image
-            img_name = filename.replace('.txt', '.jpg')
-            src_img = os.path.join(IMAGE_DIR, img_name)
-            dst_img = os.path.join(BALANCED_IMAGE_DIR, img_name)
-            if os.path.exists(src_img):
-                shutil.copy(src_img, dst_img)
-            else:
-                print(f"⚠️ Image not found for label: {filename}")
+    print("\n📈 Class Distribution Comparison (Train vs. Val):")
+    print(f"{'Class':>6} | {'Train Count':>12} | {'Train %':>8} | {'Val Count':>10} | {'Val %':>8} | {'Diff %':>8}")
+    print("-" * 70)
 
-    print("\n✅ Balanced dataset created at:", BALANCED_ROOT)
+    for cls in all_classes:
+        t_count = train_dist.get(cls, 0)
+        v_count = val_dist.get(cls, 0)
+        t_pct = t_count / train_total * 100 if train_total > 0 else 0
+        v_pct = v_count / val_total * 100 if val_total > 0 else 0
+        diff = abs(t_pct - v_pct)
+        print(f"{cls:>6} | {t_count:>12} | {t_pct:>7.1f}% | {v_count:>10} | {v_pct:>7.1f}% | {diff:>7.1f}%")
 
-# === Run ===
+# === MAIN ===
 if __name__ == "__main__":
-    class_counts, label_map = analyze_class_distribution(LABEL_DIR)
-    create_balanced_dataset(label_map, class_counts)
+    random.seed(42)
+    print("🔍 YOLO Dataset Class Distribution Analyzer")
+    print("=" * 50)
+
+    if not os.path.exists(DATASET_DIR):
+        print(f"❌ Dataset not found: {DATASET_DIR}")
+        exit(1)
+
+    dataset = collect_samples()
+    os.makedirs(PLOT_DIR, exist_ok=True)
+
+    report_distribution(dataset['train'], "TRAIN Class Distribution", os.path.join(PLOT_DIR, "train.png"))
+    report_distribution(dataset['val'], "VAL Class Distribution", os.path.join(PLOT_DIR, "val.png"))
+    compare_distributions(dataset['train'], dataset['val'])
+
+    print(f"\n✅ Distribution plots saved to: {PLOT_DIR}")

@@ -1,6 +1,5 @@
 from ultralytics import YOLO
 import torch
-import csv
 import os
 
 # Gets the current working directory
@@ -31,17 +30,17 @@ def train(model, dataset, epochs, results_name):
     """
 
     save_path = os.path.join(current_directory, 'results')
-    _ = model.train(data=dataset, epochs=epochs, save=True, project=save_path, name=results_name)
+    _ = model.train(data=dataset, epochs=epochs, save=True, project=save_path, name=results_name, freeze = 9)
 
 def main():
     device = get_best_device()
     print(f"Using device: {device}")
 
     # Load the YOLO 11m model with pretrained weights
-    model = YOLO('yolo11n.pt', verbose= True).to(device)
+    model = YOLO('yolo11m.pt', verbose= True).to(device)
     dataset = os.path.join(current_directory,'labeled_image_data/data.yaml')
     epochs = 100
-    results_name = 'Original dataset 100 epochs'
+    results_name = 'Original dataset 100 epochs freeeze 9 M'
     train(model, dataset, epochs, results_name)
 
 main()

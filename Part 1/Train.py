@@ -19,7 +19,7 @@ def get_best_device():
         return torch.device("cpu")
 
 
-def train(model, dataset, epochs, results_name):
+def train(model, dataset, epochs, results_name, freeze):
     """
     Train the YOLO model with the specified dataset and number of epochs.
 
@@ -30,17 +30,18 @@ def train(model, dataset, epochs, results_name):
     """
 
     save_path = os.path.join(current_directory, 'results')
-    _ = model.train(data=dataset, epochs=epochs, save=True, project=save_path, name=results_name, freeze = 9)
+    _ = model.train(data=dataset, epochs=epochs, save=True, project=save_path, name=results_name, freeze = freeze)
 
 def main():
     device = get_best_device()
     print(f"Using device: {device}")
 
-    # Load the YOLO 11m model with pretrained weights
-    model = YOLO('yolo11m.pt', verbose= True).to(device)
-    dataset = os.path.join(current_directory,'labeled_image_data/data.yaml')
+    # Load the YOLO 11n model with pretrained weights
+    model = YOLO('yolo11n.pt', verbose= True).to(device)
+    dataset = os.path.join(current_directory,'augmented_dataset/data.yaml')
     epochs = 100
-    results_name = 'Original dataset 100 epochs freeeze 9 M'
-    train(model, dataset, epochs, results_name)
+    results_name = 'Augmented dataset 100 epochs n'
+    train(model, dataset, epochs, results_name, 6)
+
 
 main()

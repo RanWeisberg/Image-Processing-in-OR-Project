@@ -42,7 +42,7 @@ def draw_boxes(image_path, label_path):
 # === EXAMPLE USAGE ===
 if __name__ == '__main__':
     # Provide full paths here
-    image_path = '/Users/ranweisberg/PycharmProjects/Image Processing in OR Project/Image-Processing-in-OR-Project/Part 1/augmented_dataset/images/train/1c0b1584-frame_1789_rgb_dropout.jpg'
-    label_path = '/Users/ranweisberg/PycharmProjects/Image Processing in OR Project/Image-Processing-in-OR-Project/Part 1/augmented_dataset/labels/train/1c0b1584-frame_1789_rgb_dropout.txt'
+    image_path = '/Users/ranweisberg/PycharmProjects/Image Processing in OR Project/Image-Processing-in-OR-Project/Part 1/augmented_dataset/images/train/91ebf442-frame_3726.jpg'
+    label_path = '/Users/ranweisberg/PycharmProjects/Image Processing in OR Project/Image-Processing-in-OR-Project/Part 1/augmented_dataset/labels/train/91ebf442-frame_3726.txt'
 
     draw_boxes(image_path, label_path)

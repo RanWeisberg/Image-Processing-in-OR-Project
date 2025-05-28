@@ -6,7 +6,9 @@ from glob import glob
 from shutil import copy2
 from albumentations import (
     RandomCrop, HueSaturationValue, RandomBrightnessContrast,
-    GaussianBlur, GaussNoise, BboxParams, Compose
+    GaussianBlur, GaussNoise, MotionBlur, GlassBlur, Downscale,
+    RandomShadow, RandomSunFlare, HorizontalFlip, GridDistortion,
+    BboxParams, Compose
 )
 
 # CONFIGURATION
@@ -14,8 +16,11 @@ current_directory = os.getcwd()
 INPUT_DIR = os.path.join(current_directory, 'labeled_image_data')
 OUTPUT_DIR = os.path.join(current_directory, 'augmented_dataset')
 MODE = 'full'  # 'full' or 'single'
-TARGET_AUG = 'rotate'  # only used in 'single' mode
-SELECTED_AUGMENTATIONS = ['rotate', 'crop', 'brightness', 'contrast', 'hue', 'blur', 'noise', 'rgb_dropout']
+TARGET_AUG = 'motion_blur'  # only used in 'single' mode
+SELECTED_AUGMENTATIONS = [
+    'rotate', 'crop', 'brightness', 'rgb_dropout', 'motion_blur', 'glass_blur',
+    'downscale', 'shadow', 'sun_flare', 'grid_elastic'
+]
 IMAGE_EXTENSIONS = ['.jpg', '.png', '.jpeg']
 
 # --- PART 2: Augmentation Functions ---
@@ -23,59 +28,26 @@ def rotate_image_custom(img, boxes, angle=10):
     h, w = img.shape[:2]
     center = (w / 2, h / 2)
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    cos = np.abs(M[0, 0])
-    sin = np.abs(M[0, 1])
-    nW = int((h * sin) + (w * cos))
-    nH = int((h * cos) + (w * sin))
-
+    cos, sin = np.abs(M[0, 0]), np.abs(M[0, 1])
+    nW, nH = int((h * sin) + (w * cos)), int((h * cos) + (w * sin))
     M[0, 2] += (nW / 2) - center[0]
     M[1, 2] += (nH / 2) - center[1]
     rotated_img = cv2.warpAffine(img, M, (nW, nH))
-
     rotated_boxes = []
-    for box in boxes:
-        x_min, y_min, x_max, y_max, cls = box
+    for x_min, y_min, x_max, y_max, cls in boxes:
         corners = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
         corners = np.hstack([corners, np.ones((4, 1))])
         transformed = M.dot(corners.T).T
-        x_coords = transformed[:, 0]
-        y_coords = transformed[:, 1]
+        x_coords, y_coords = transformed[:, 0], transformed[:, 1]
         new_box = [min(x_coords), min(y_coords), max(x_coords), max(y_coords), cls]
         rotated_boxes.append(new_box)
-
     return {'image': rotated_img, 'bboxes': [b[:4] for b in rotated_boxes], 'class_labels': [b[4] for b in rotated_boxes]}
 
-def crop_image(img, boxes, crop_percent=0.9):
-    h, w = img.shape[:2]
-    crop_size = int(crop_percent * min(w, h))
-    aug = Compose([RandomCrop(height=crop_size, width=crop_size)],
-                  bbox_params=BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.3))
-    return aug(image=img, bboxes=[b[:4] for b in boxes], class_labels=[b[4] for b in boxes])
-
-def brightness_image(img, boxes, brightness_limit=0.2):
-    aug = Compose([RandomBrightnessContrast(brightness_limit=brightness_limit, contrast_limit=0)],
-                  bbox_params=BboxParams(format='pascal_voc', label_fields=['class_labels']))
-    return aug(image=img, bboxes=[b[:4] for b in boxes], class_labels=[b[4] for b in boxes])
-
-def contrast_image(img, boxes, contrast_limit=0.2):
-    aug = Compose([RandomBrightnessContrast(brightness_limit=0, contrast_limit=contrast_limit)],
-                  bbox_params=BboxParams(format='pascal_voc', label_fields=['class_labels']))
-    return aug(image=img, bboxes=[b[:4] for b in boxes], class_labels=[b[4] for b in boxes])
-
-def hue_image(img, boxes, hue_shift_limit=10):
-    aug = Compose([HueSaturationValue(hue_shift_limit=hue_shift_limit)],
-                  bbox_params=BboxParams(format='pascal_voc', label_fields=['class_labels']))
-    return aug(image=img, bboxes=[b[:4] for b in boxes], class_labels=[b[4] for b in boxes])
-
-def blur_image(img, boxes, blur_limit=(3, 5)):
-    aug = Compose([GaussianBlur(blur_limit=blur_limit)],
-                  bbox_params=BboxParams(format='pascal_voc', label_fields=['class_labels']))
-    return aug(image=img, bboxes=[b[:4] for b in boxes], class_labels=[b[4] for b in boxes])
-
-def noise_image(img, boxes, var_limit=(10.0, 50.0)):
-    aug = Compose([GaussNoise(var_limit=var_limit)],
-                  bbox_params=BboxParams(format='pascal_voc', label_fields=['class_labels']))
-    return aug(image=img, bboxes=[b[:4] for b in boxes], class_labels=[b[4] for b in boxes])
+def albumentations_wrapper(augmentation):
+    def wrapper(img, boxes):
+        aug = Compose([augmentation], bbox_params=BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.3))
+        return aug(image=img, bboxes=[b[:4] for b in boxes], class_labels=[b[4] for b in boxes])
+    return wrapper
 
 def rgb_channel_dropout(img, boxes, dropout_ratio=0.5):
     out_img = img.copy()
@@ -90,13 +62,16 @@ def rgb_channel_dropout(img, boxes, dropout_ratio=0.5):
 
 AUGMENT_FUNCS = {
     'rotate': lambda img, boxes: rotate_image_custom(img, boxes, angle=10),
-    'crop': lambda img, boxes: crop_image(img, boxes, crop_percent=0.9),
-    'brightness': lambda img, boxes: brightness_image(img, boxes, brightness_limit=0.2),
-    'contrast': lambda img, boxes: contrast_image(img, boxes, contrast_limit=0.2),
-    'hue': lambda img, boxes: hue_image(img, boxes, hue_shift_limit=10),
-    'blur': lambda img, boxes: blur_image(img, boxes, blur_limit=(3, 5)),
-    'noise': lambda img, boxes: noise_image(img, boxes, var_limit=(10.0, 50.0)),
+    'crop': albumentations_wrapper(RandomCrop(height=400, width=400)),
+    'brightness': albumentations_wrapper(RandomBrightnessContrast(brightness_limit=0.4, contrast_limit=0)),
     'rgb_dropout': lambda img, boxes: rgb_channel_dropout(img, boxes, dropout_ratio=0.5),
+    'motion_blur': albumentations_wrapper(MotionBlur(blur_limit=(19, 21))),
+    'glass_blur': albumentations_wrapper(GlassBlur(sigma=0.7, max_delta=4)),
+    'downscale': albumentations_wrapper(Downscale(scale_range=(0.1, 0.3))),
+    'shadow': albumentations_wrapper(RandomShadow()),
+    'sun_flare': albumentations_wrapper(RandomSunFlare()),
+    'h_flip': albumentations_wrapper(HorizontalFlip()),
+    'grid_elastic': albumentations_wrapper(GridDistortion(num_steps=5, distort_limit=0.3)),
 }
 
 # --- PART 3: Utilities ---
@@ -117,17 +92,14 @@ def load_labels(label_path, img_w, img_h):
     with open(label_path, 'r') as f:
         for line in f:
             cls, x, y, w, h = map(float, line.strip().split())
-            x_min = (x - w / 2) * img_w
-            y_min = (y - h / 2) * img_h
-            x_max = (x + w / 2) * img_w
-            y_max = (y + h / 2) * img_h
+            x_min, y_min = (x - w / 2) * img_w, (y - h / 2) * img_h
+            x_max, y_max = (x + w / 2) * img_w, (y + h / 2) * img_h
             boxes.append([x_min, y_min, x_max, y_max, int(cls)])
     return boxes
 
 def save_labels(label_path, boxes, img_w, img_h):
     with open(label_path, 'w') as f:
-        for box in boxes:
-            x_min, y_min, x_max, y_max, cls = box
+        for x_min, y_min, x_max, y_max, cls in boxes:
             x = (x_min + x_max) / 2 / img_w
             y = (y_min + y_max) / 2 / img_h
             w = (x_max - x_min) / img_w
@@ -164,8 +136,10 @@ def augment_folder(split):
             try:
                 result = aug_func(img.copy(), boxes)
                 aug_img = result['image']
-                aug_boxes = [list(b) + [cls] for b, cls in zip(result['bboxes'], result['class_labels'])
-                             if b[2] > b[0] and b[3] > b[1]]
+                aug_boxes = [
+                    list(b) + [cls] for b, cls in zip(result['bboxes'], result['class_labels'])
+                    if b[2] > b[0] and b[3] > b[1]
+                ]
                 if aug_boxes:
                     aug_base = f"{base}_{aug_name}"
                     cv2.imwrite(os.path.join(out_img_path, aug_base + '.jpg'), aug_img)
@@ -174,7 +148,7 @@ def augment_folder(split):
             except Exception as e:
                 print(f"❌ Error applying {aug_name} to {base}: {e}")
 
-# --- MAIN ---
+# --- MAIN EXECUTION ---
 if __name__ == '__main__':
     print(f"✨ Starting in {MODE.upper()} mode...")
     if MODE == 'single':

@@ -9,7 +9,7 @@ VIDEO_PATH = r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\id_video
 OUTPUT_DIR = r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\video_output"
 YOLO_WEIGHTS = r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\Part 1\results\Original dataset 100 epochs YOLO M\weights\best.pt"
 CONF_THRESHOLD = 0.8  # This is your 'p'
-FRAME_JUMP = 5                        # Process every 5th frame
+FRAME_JUMP = 5                     # Process every 5th frame - 1 is every frame.
 OUTPUT_VIDEO_NAME = 'bbox_video.mp4'
 
 # === SETUP OUTPUT FOLDERS ===
@@ -100,7 +100,9 @@ while frame_idx < total_frames:
         vis_path = os.path.join(bbox_dir, image_name)
         cv2.imwrite(vis_path, vis_frame)
         video_writer.write(vis_frame)
-
+    if FRAME_JUMP < 0:
+        print(f"Skipping frame {frame_idx} (no detections)")
+        FRAME_JUMP = 10
     frame_idx += FRAME_JUMP
 
 # === CLEANUP ===

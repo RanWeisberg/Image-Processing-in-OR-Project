@@ -44,4 +44,5 @@ def main():
     train(model, dataset, epochs, results_name, 6)
 
 
-main()
+if __name__ == "__main__":
+    main()

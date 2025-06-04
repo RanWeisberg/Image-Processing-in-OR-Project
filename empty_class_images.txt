@@ -1,2 +1,0 @@
-[train] /Users/ranweisberg/PycharmProjects/Image Processing in OR Project/Image-Processing-in-OR-Project/Part 1/labeled_image_data/images/train/6ed8d772-frame_4769.jpg
-[train] /Users/ranweisberg/PycharmProjects/Image Processing in OR Project/Image-Processing-in-OR-Project/Part 1/labeled_image_data/images/train/a8cc7756-frame_2683.jpg

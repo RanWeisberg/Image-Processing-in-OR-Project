@@ -3,6 +3,9 @@ import shutil
 import pandas as pd
 import matplotlib.pyplot as plt
 
+# Gets the current working directory
+current_directory = os.getcwd()
+
 def read_csv(file_path):
     # Determine folder and names
     folder = os.path.dirname(file_path)

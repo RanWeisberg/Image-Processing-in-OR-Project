@@ -1,6 +1,9 @@
 import cv2
 import os
 
+# Gets the current working directory
+current_directory = os.getcwd()
+
 def load_yolo_labels(label_path, img_width, img_height):
     boxes = []
     with open(label_path, 'r') as f:
@@ -47,9 +50,9 @@ def draw_boxes(image_path, label_path, save_path=None, show=True):
 # === EXAMPLE USAGE ===
 if __name__ == '__main__':
     # Provide full paths here
-    image_path = '/Users/ranweisberg/PycharmProjects/Image Processing in OR Project/Image-Processing-in-OR-Project/Part 1/labeled_image_data/images/train/0018fa1f-output_0063.png'
-    label_path = '/Users/ranweisberg/PycharmProjects/Image Processing in OR Project/Image-Processing-in-OR-Project/Part 1/labeled_image_data/labels/train/0018fa1f-output_0063.txt'
-    save_path = '/Users/ranweisberg/PycharmProjects/Image Processing in OR Project/Image-Processing-in-OR-Project/Part 1/Data Visualization/0018fa1f-output_0063_with_boxes.jpg'
+    image_path = os.path.join(current_directory, "labeled_image_data/images/train/0018fa1f-output_0063.png")
+    label_path = os.path.join(current_directory,  'labeled_image_data/labels/train/0018fa1f-output_0063.txt')
+    save_path = os.path.join(current_directory,  'Data Visualization/0018fa1f-output_0063_with_boxes.jpg')
 
     draw_boxes(image_path, label_path, save_path=save_path, show=False)  # Set show=True if you still want to display
 

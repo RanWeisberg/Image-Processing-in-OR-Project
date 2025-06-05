@@ -7,9 +7,9 @@ import shutil
 # PARAMETERS
 main_folder = os.path.dirname(os.path.abspath(__file__))
 VIDEO_PATH = os.path.join(main_folder, "Data", "surg_1.mp4")
-OUTPUT_DIR = os.path.join(main_folder, "Data Visualization",'surg_1')
-YOLO_WEIGHTS = os.path.join(main_folder, "models", "post_videos", "yolo11s_post_videos2", "weights", "best.pt")
-# YOLO_WEIGHTS = os.path.join(main_folder, "Part 1", "aug_test", "yolo11s_augmented", "weights", "best.pt")
+OUTPUT_DIR = os.path.join(main_folder, "Data Visualization",'surg_1_increased_cls_loss')
+YOLO_WEIGHTS = os.path.join(main_folder,'models', 'yolo11m_post_videos_increased_cls_loss', 'weights', "last.pt") #last and not best
+# YOLO_WEIGHTS = os.path.join(main_folder, "models", "aug_test", "yolo11s_augmented", "weights", "best.pt")
 
 # Default “global” confidence threshold (used only if a class-specific threshold is not provided)
 default_threshold = 0.25
@@ -18,13 +18,19 @@ default_threshold = 0.25
 # Modify these values based on your own class indices and desired cutoffs
 # For example, if your model has 3 classes (0, 1, 2), you might do:
 class_conf_thresholds = {
-    0: 0.90,   # e.g. “Empty”
-    1: 0.30,   # e.g. “Tweezers”
-    2: 0.85,   # e.g. “Needle_driver”
+    0: 0.7,   # e.g. “Empty”
+    1: 0.7,   # e.g. “Tweezers”
+    2: 0.7,   # e.g. “Needle_driver”
 }
 
 FRAME_JUMP = 3
 OUTPUT_VIDEO_NAME = "bbox_video.mp4"
+class_counter = {
+    "frame_counter": 0,
+    "class_1": 0,  # Replace with actual class names
+    "class_2": 0,  # Replace with actual class names
+    "class_0": 0,  # Replace with actual class names
+}
 
 # === OUTPUT TOGGLES ===
 OUTPUT_LABELS = True  # <--- Toggle to False if you only want to output video with drawn boxes
@@ -88,6 +94,7 @@ while frame_idx < total_frames:
             # Extract xywh coordinates
             xc, yc, w, h = [float(x) for x in box.xywh[0]]
             bboxes.append([xc, yc, w, h, conf, cls_id])
+            class_counter[f"class_{cls_id}"] += 1
 
     if bboxes:
         image_name = f"frame_{frame_idx:05d}.jpg"
@@ -150,13 +157,22 @@ while frame_idx < total_frames:
                 )
             video_writer.write(vis_frame)
 
+
     # Advance by FRAME_JUMP frames
     if FRAME_JUMP < 0:
         print(f"Skipping frame {frame_idx} (no detections)")
         FRAME_JUMP = 10
     frame_idx += FRAME_JUMP
 
+
+
 # === CLEANUP ===
 cap.release()
 video_writer.release()
+# print(f"Processed {frame_idx} frames out of {total_frames/3} total frames.")
+print(f"Class counts from {total_frames} frames:")
+for cls, count in class_counter.items():
+    if cls == "frame_counter":
+        continue  # Skip the frame counter
+    print(f"  {cls}: {count}")
 print(f"✅ Done. Output saved to '{OUTPUT_DIR}'")

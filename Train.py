@@ -428,6 +428,7 @@ def train_model(control, yaml_path):
         cos_lr=True,  # Use cosine learning rate scheduler
         dropout=    s['dropout'],  # Set to 0.0 if not using dropout
         project   = s['project'],
+        cls = 3, #cls weights
     )
     model.val(data=yaml_path, save_json=True, save_txt=True, conf = 0.8)
     LOGGER.info("Training completed.")
@@ -451,9 +452,12 @@ if __name__ == '__main__':
             'val': os.path.join(current_folder, "Data", "val"),
             'all_train_data': os.path.join(current_folder, "Data", "all_train"),
             'labeld_data': os.path.join(current_folder, "Data", "labeld_data"),
-
-            'video1': os.path.join(current_folder, "video_output_20_2_24_1"),
-            'video2': os.path.join(current_folder, "video_output_4_2_24_B_2"),
+            #ID video data
+            'video1': os.path.join(current_folder, "Data Visualization", "video_output_20_2_24_1"),
+            'video2': os.path.join(current_folder, "Data Visualization", "video_output_4_2_24_B_2"),
+            #OOD video data
+            'video3': os.path.join(current_folder, "Data Visualization", "surg_1"),
+            #augmented data folder
             'augmented': os.path.join(current_folder, "Data", "augmented_dataset"),
         },
         'train_settings': {
@@ -502,25 +506,26 @@ if __name__ == '__main__':
     # train_model(CONTROL, yaml_file)
 
     #post - video
-    copy_folders = [CONTROL['folders']['labeld_data'], CONTROL['folders']['video1'], CONTROL['folders']['video2']]
-    training_path = CONTROL['folders']['all_train_data']
-    ydata.copy_data(input_folders=copy_folders,output_folder=training_path, delete_existing=True)
-    CONTROL['folders']['train'] = training_path
-    ydata.apply_augmentation(CONTROL['folders']['train'], CONTROL['folders']['augmented'], show_number=0, p=0.2, data_factor=2, p_noise=0.2)
+    # copy_folders = [CONTROL['folders']['labeld_data'], CONTROL['folders']['video1'], CONTROL['folders']['video2']]
+    # training_path = CONTROL['folders']['all_train_data']
+    # ydata.copy_data(input_folders=copy_folders,output_folder=training_path, delete_existing=True)
+    # CONTROL['folders']['train'] = training_path
+    # ydata.apply_augmentation(CONTROL['folders']['train'], CONTROL['folders']['augmented'], show_number=0, p=0.4, data_factor=5, p_noise=0.2)
     CONTROL['folders']['train'] = CONTROL['folders']['augmented']
+    CONTROL['train_settings']['batch_size'] = 0.5
     yaml_file = ydata.create_yaml(
         output_path= yaml_path,
         train_path = CONTROL['folders']['train'],
         val_path   = CONTROL['folders']['val'],
         names      = ['Empty', 'Tweezers', 'Needle_driver'],
-        check_split = True
+        check_split = False
     )
 
     # CONTROL['train_settings']['model_name'] = 'yolo11n_no_augmented'
     # CONTROL['train_settings']['model_type'] = 'yolo11n'
     # train_model(CONTROL, yaml_file)
-    CONTROL['train_settings']['model_name'] = 'yolo11s_post_videos'
-    CONTROL['train_settings']['model_type'] = 'yolo11s'
+    CONTROL['train_settings']['model_name'] = 'yolo11m_post_videos_no_aug'
+    CONTROL['train_settings']['model_type'] = 'yolo11m'
     train_model(CONTROL, yaml_file)
     # CONTROL['train_settings']['model_name'] = 'yolo11m_no_augmented'
     # CONTROL['train_settings']['model_type'] = 'yolo11m'

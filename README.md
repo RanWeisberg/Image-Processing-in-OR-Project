@@ -15,9 +15,9 @@ The system detects surgical instruments (tweezers and needle drivers) and hands 
 
 Due to size constraints, the dataset and video files are hosted externally:
 
-- **Labeled Dataset (images + labels)**: [Download from Google Drive](YOUR_DRIVE_LINK_HERE)
-- **Raw Videos (ID + OOD)**: [Download from Google Drive](YOUR_DRIVE_LINK_HERE)
-- **Detection Results Videos (with bounding boxes)**: [Download from Google Drive](YOUR_DRIVE_LINK_HERE)
+- **Labeled Dataset (images + labels)**: [Download from OneDrive](https://technionmail-my.sharepoint.com/:f:/g/personal/ranweisberg_campus_technion_ac_il/ElxQQwqOT3hOkq_bUke22OABECN33cO_xFFC0VVLtJhHwA?e=vQRfs0)
+- **Raw Videos (ID + OOD)**: [Download fromOneDrive](YOUR_DRIVE_LINK_HERE)
+- **Detection Results Videos (with bounding boxes)**: [Download from OneDrive](YOUR_DRIVE_LINK_HERE)
 
 After downloading:
 1. Extract the labeled dataset to the root directory of the project

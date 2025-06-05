@@ -3,7 +3,7 @@ import os
 from ultralytics import YOLO
 
 # Paths
-weights_rel_path = "results/Original dataset 100 epochs YOLO M/weights/best.pt"
+weights_rel_path = "models/aug_test/yolo11s_augmented/weights/best.pt"
 video_rel_path = "id_video_data/4_2_24_B_2.mp4"
 output_dir = "video_results"
 

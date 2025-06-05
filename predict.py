@@ -2,7 +2,7 @@ import os
 import cv2
 from ultralytics import YOLO
 
-weights_rel_path = "results/Original dataset 100 epochs YOLO M/weights/best.pt"
+weights_rel_path = "models/aug_test/yolo11s_augmented/weights/best.pt"
 input_image_path = "labeled_image_data/images/train/a2ca750f-frame_2832.jpg"
 output_dir = "image_results"
 os.makedirs(output_dir, exist_ok=True)

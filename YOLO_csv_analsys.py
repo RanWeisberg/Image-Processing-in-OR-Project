@@ -2,9 +2,8 @@ import os
 import shutil
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import figure
 
-# Gets the current working directory
-current_directory = os.getcwd()
 
 def read_csv(file_path):
     # Determine folder and names
@@ -30,20 +29,21 @@ def read_csv(file_path):
 
 if __name__ == '__main__':
     # 1) Define all CSV paths in a single dictionary
+    current_folder = os.path.dirname(os.path.abspath(__file__))
     path_files = {
-        "aug_no_freeze_n": r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\Part 1\aug_no_freeze\yolo11n_augmented_no_freeze\results.csv",
-        "aug_no_freeze_s": r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\Part 1\aug_no_freeze\yolo11s_augmented_no_freeze\results.csv",
-        "aug_no_freeze_m": r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\Part 1\aug_no_freeze\yolo11m_augmented_no_freeze\results.csv",
-        "aug_m": r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\Part 1\model_size_aug\augmented_yolo11m\results.csv",
-        "aug_s": r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\Part 1\model_size_aug\augmented_yolo11s\results.csv",
-        "aug_n": r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\Part 1\model_size_aug\augmented_yolo11n\results.csv",
-        "m":     r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\Part 1\model_size_no_aug\yolo11m\results.csv",
-        "s":     r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\Part 1\model_size_no_aug\yolo11s\results.csv",
-        "n":     r"C:\Users\cadsegev\Desktop\Image-Processing-in-OR-Project\Part 1\model_size_no_aug\yolo11n\results.csv",
+        "aug_no_freeze_n": os.path.join(current_folder, "models", "aug_no_freeze", "yolo11n_augmented_no_freeze", "results.csv"),
+        "aug_no_freeze_s": os.path.join(current_folder, "models", "aug_no_freeze", "yolo11s_augmented_no_freeze", "results.csv"),
+        "aug_no_freeze_m": os.path.join(current_folder, "models", "aug_no_freeze", "yolo11m_augmented_no_freeze", "results.csv"),
+        "aug_freeze_n": os.path.join(current_folder, "models", "aug_test", "yolo11n_augmented", "results.csv"),
+        "aug_freeze_s": os.path.join(current_folder, "models", "aug_test", "yolo11s_augmented", "results.csv"),
+        "aug_freeze_m": os.path.join(current_folder, "models", "aug_test", "yolo11m_augmented", "results.csv"),
+        "no_aug_freeze_n": os.path.join(current_folder, "models", "no_aug_test", "yolo11n_no_augmented", "results.csv"),
+        "no_aug_freeze_s": os.path.join(current_folder, "models", "no_aug_test", "yolo11s_no_augmented", "results.csv"),
+        "no_aug_freeze_m": os.path.join(current_folder, "models", "no_aug_test", "yolo11m_no_augmented", "results.csv"),
     }
 
     # 2) Choose which models to load
-    wanted_keys = ["aug_no_freeze_n", "aug_no_freeze_s", "aug_no_freeze_m"]
+    wanted_keys = ["no_aug_freeze_s", "aug_freeze_s", "aug_no_freeze_s"]
 
     # 3) Read each CSV into a DataFrame and store in a dict called dfs
     dfs = { key: read_csv(path_files[key]) for key in wanted_keys }
@@ -54,39 +54,21 @@ if __name__ == '__main__':
         for col in df.columns:
             print(col)
 
-    # 5) Plotting: one figure with 3 subplots (train_loss, val_loss, mAP@50)
+
+    # # 5) Plotting: one figure with 3 subplots (train_loss, val_loss, mAP@50)
     map50_col = 'metrics/mAP50(B)'
-
-    fig, axs = plt.subplots(3, 1, figsize=(10, 16), sharex=True)
-    fig.suptitle('Comparison Across Models', fontsize=16, y=0.98)
-
-    # Top subplot: train_total_loss
+    toal_val_loss_col = 'val_total_loss'
+    presicion_col = 'metrics/precision(B)'
+    #plots as one figure
+    figure(figsize=(16, 16))
     for key, df in dfs.items():
-        axs[0].plot(df['epoch'], df['train_total_loss'], label=key)
-    axs[0].set_title('Train Total Loss')
-    axs[0].set_ylabel('Train Total Loss')
-    axs[0].legend()
-    axs[0].grid(True)
-
-    # Middle subplot: val_total_loss
-    for key, df in dfs.items():
-        axs[1].plot(df['epoch'], df['val_total_loss'], label=key)
-    axs[1].set_title('Validation Total Loss')
-    axs[1].set_ylabel('Val Total Loss')
-    axs[1].legend()
-    axs[1].grid(True)
-
-    # Bottom subplot: mAP@50
-    for key, df in dfs.items():
-        if map50_col in df.columns:
-            axs[2].plot(df['epoch'], df[map50_col], label=key)
-        else:
-            print(f"Warning: '{map50_col}' not found in '{key}' DataFrame.")
-    axs[2].set_title('mAP@50')
-    axs[2].set_xlabel('Epochs')
-    axs[2].set_ylabel('mAP@50')
-    axs[2].legend()
-    axs[2].grid(True)
-
-    plt.tight_layout(rect=[0, 0, 1, 0.96])  # leave space for the suptitle
+        plt.plot(df['epoch'], df[map50_col], label=f"{key} mAP@50")
+    plt.title('mAP@50 Across Models', fontsize=24)
+    plt.xlabel('Epochs', fontsize=20)
+    plt.ylabel('mAP@50', fontsize=20)
+    plt.legend(fontsize=20, loc='lower right')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig('mAP50_across_models.png', dpi=150)
     plt.show()
+    plt.close()

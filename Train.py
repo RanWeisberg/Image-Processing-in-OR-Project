@@ -10,15 +10,8 @@ import random
 import albumentations as A
 import torch
 
-# ──────────────────────────────────────────────────────────────
-# Logger setup
-# ──────────────────────────────────────────────────────────────
-
+# ─── Logger setup ─────────────────────────────────────────────────────────────
 def setup_logger():
-    """
-    Sets up a basic logger with INFO level and a simple stream handler.
-    Prevents duplicate handlers in case of repeated calls.
-    """
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     if not logger.handlers:
@@ -29,29 +22,18 @@ def setup_logger():
 
 LOGGER = setup_logger()
 
-# ──────────────────────────────────────────────────────────────
-# Data utilities for YOLO datasets
-# ──────────────────────────────────────────────────────────────
-
+# ─── Data utilities ────────────────────────────────────────────────────────────
 class YOLOData:
-    """
-    Utility class for manipulating YOLO dataset folders, visualizing samples,
-    copying/merging datasets, augmenting images+labels, and generating YAML configs.
-    """
     def __init__(self, control):
-        # Parse control dictionary for relevant paths
         self.control   = control
         self.train_dir = control['folders']['train']
         self.val_dir   = control['folders']['val']
         LOGGER.info(f"Initialized YOLOData with train={self.train_dir}, val={self.val_dir}")
-
     def debug_load_images_and_labels(self, folder=None, index=None, image_path=None, label_path=None):
         """
-        Debug function for visualizing YOLO images and their bounding boxes.
-
-        (A) If folder and index are given: randomly sample 'index' images+labels from the folder.
-        (B) If image_path and label_path are given: visualize that single pair.
-        Draws images using matplotlib with rectangles for each bounding box.
+        (A) If folder+index: randomly sample 'index' images from folder/images and folder/labels.
+        (B) If image_path+label_path: handle a single pair.
+        Then display each image with its bounding boxes.
         """
         images_list = []
         labels_list = []
@@ -60,7 +42,6 @@ class YOLOData:
             print(f"✅ [INFO] Using folder='{folder}' and sampling {index} pairs.")
             images_dir = os.path.join(folder, "images")
             labels_dir = os.path.join(folder, "labels")
-            # Only .png images considered here (can add more extensions)
             all_img_files = [f for f in os.listdir(images_dir) if f.lower().endswith(".png")]
             all_lbl_files = [f for f in os.listdir(labels_dir) if f.lower().endswith(".txt")]
             all_img_files.sort()
@@ -83,7 +64,6 @@ class YOLOData:
             print("❌ [DEBUG] Provide either (folder & index) or (image_path & label_path).")
             return
 
-        # Iterate through image-label pairs and plot bboxes
         for (img_path, lbl_path) in zip(images_list, labels_list):
             print(f"✅ [INFO] Attempting to load image: {img_path}")
             if not os.path.isfile(img_path):
@@ -103,13 +83,12 @@ class YOLOData:
                 lines = [line.strip() for line in f if line.strip()]
             boxes = []
             for line in lines:
-                # Each label line is expected to be: cls_id x_center y_center width height (all normalized)
                 parts = line.split()
                 if len(parts) != 5:
                     print(f"⚠️ [DEBUG] Invalid line => '{line}'")
                     continue
                 try:
-                    cls_id = int(float(parts[0]))
+                    cls_id = cls_id = int(float(parts[0]))
                     x_center = float(parts[1])
                     y_center = float(parts[2])
                     w_norm = float(parts[3])
@@ -117,7 +96,6 @@ class YOLOData:
                 except ValueError:
                     print(f"❌ [DEBUG] Could not parse => '{line}'")
                     continue
-                # Convert normalized bbox to absolute pixel coordinates
                 x_center_abs = x_center * img_w
                 y_center_abs = y_center * img_h
                 w_abs = w_norm * img_w
@@ -126,7 +104,6 @@ class YOLOData:
                 y1 = y_center_abs - h_abs / 2
                 boxes.append((cls_id, x1, y1, w_abs, h_abs))
             print(f"✅ [INFO] Found {len(boxes)} bounding boxes in {lbl_path}")
-            # Plot image and bounding boxes
             fig, ax = plt.subplots(1)
             ax.imshow(image_rgb)
             for (cls_id, x, y, w_box, h_box) in boxes:
@@ -138,11 +115,11 @@ class YOLOData:
             ax.axis('off')
             plt.show()
         print("✅ [INFO] Done displaying images + bounding boxes.")
-
     def copy_data(self, input_folders, output_folder, delete_existing=True):
         """
-        Merges multiple input folders into a single YOLO dataset at output_folder.
-        All images/labels are renamed as image_{index}.png/txt to avoid collisions.
+        Copy images+labels from multiple input_folders into one YOLO-style
+        dataset at output_folder/images + output_folder/labels.
+        Each input folder must contain 'images/' and 'labels/'.
         """
         out_img = os.path.join(output_folder, 'images')
         out_lbl = os.path.join(output_folder, 'labels')
@@ -171,7 +148,6 @@ class YOLOData:
                     LOGGER.warning(f"No label for {fname}, skipping")
                     continue
 
-                # Use a running index to guarantee unique filenames
                 img_dst = os.path.join(out_img, f'image_{count}.png')
                 lbl_dst = os.path.join(out_lbl, f'image_{count}.txt')
                 shutil.copy(img_src, img_dst)
@@ -180,20 +156,12 @@ class YOLOData:
 
         LOGGER.info(f"Copied {count} samples to {output_folder}")
         return count
-
     def apply_augmentation(self, input_dir, output_dir, show_number=5, p=0.3, data_factor=1.0, p_noise=1):
-        """
-        Augments images and labels in YOLO format with Albumentations.
-        - input_dir: original data folder (must contain images/ and labels/)
-        - output_dir: where augmented images/labels are saved
-        - show_number: number of samples to visualize after augmentation
-        - p: probability for most augmentations
-        - data_factor: output dataset will be this multiple of input size
-        - p_noise: probability for noise augmentation (can be >1 to always apply)
-        """
+        #https://explore.albumentations.ai
+
         out_images = os.path.join(output_dir, "images")
         out_labels = os.path.join(output_dir, "labels")
-        # Remove any existing output directory
+        #delete the folders if they already exist
         if os.path.isdir(out_images):
             print(f"⚠️ [INFO] Deleting existing folder: {out_images}")
             shutil.rmtree(out_images)
@@ -203,17 +171,39 @@ class YOLOData:
         os.makedirs(out_images, exist_ok=True)
         os.makedirs(out_labels, exist_ok=True)
 
-        # Define Albumentations transforms (customize as needed)
+
+        #randomly images and labels from input_dir
+
         T = [
-            A.Affine(rotate=(-180, 180), scale=(0.5, 1), translate_percent=(-0.1, 0.1), shear=(-15, 15), p=p),
+            A.Affine(rotate=(-180, 180), scale=(0.5, 1), translate_percent= (-0.1,0.1), shear = (-15,15),p=p),
             A.GaussNoise(p=p_noise, std_range=(0.295, 0.3), per_channel=True),
+            # A.RandomCropFromBorders(crop_left=0.2, crop_right=0.2, crop_top=0.2, crop_bottom=0.2, p=p),
+            # A.Perspective(scale=(0.05, 0.1), fit_output=True, keep_size=True, p=p),
             A.RandomToneCurve(scale=0.2, per_channel=False, p=p),
-            A.RandomSunFlare(p=p),
-            A.D4(p=1.0),  # Random flips and rotations
+            # A.SaltAndPepper(amount = (0.1, 0.2),  salt_vs_pepper = (0.3, 0.8),  p =p),
+            A.RandomSunFlare(p=p),  # from 'sun_flare'
+            # A.Downscale(scale_min=0.1, scale_max=0.3, p=p),  # from 'downscale'
+            A.D4(p=1.0),
             A.MotionBlur(blur_limit=(19, 21), p=p),
-            A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=1),
+            A.HueSaturationValue(hue_shift_limit = 20,sat_shift_limit = 30,val_shift_limit = 20,p =1),
             A.GridElasticDeform(num_grid_xy=(4, 4), magnitude=10, p=p),
+            # A.Downscale(p=p / 5, scale_range=(0.25, 0.75)),
+            # A.ShiftScaleRotate(shift_limit=(-0.2, 0.2), scale_limit=(-0.1, 0.1), rotate_limit=(-22, 22), p=p)
         ]
+        #
+        # T = [
+        #     # A.Rotate(limit=10, p=p),  # from 'rotate'
+        #     # A.RandomCrop(height=400, width=400, p=p),  # from 'crop'
+        #     A.RandomBrightnessContrast(brightness_limit=0.4, contrast_limit=0, p=p),  # from 'brightness'
+        #     A.ChannelDropout(channel_drop_range=(1, 1), fill_value=0, p=p),  # approximate 'rgb_dropout'
+        #     A.MotionBlur(blur_limit=(19, 21), p=p),  # from 'motion_blur'
+        #     A.GlassBlur(sigma=0.7, max_delta=4, p=p),  # from 'glass_blur'
+        #     A.Downscale(scale_min=0.1, scale_max=0.3, p=p),  # from 'downscale'
+        #     A.RandomShadow(p=p),  # from 'shadow'
+        #     A.RandomSunFlare(p=p),  # from 'sun_flare'
+        #     A.HorizontalFlip(p=p),  # from 'h_flip'
+        #     A.GridDistortion(num_steps=5, distort_limit=0.3, p=p),  # from 'grid_elastic'
+        # ]
         transform = A.Compose(
             T,
             bbox_params=A.BboxParams(
@@ -230,11 +220,12 @@ class YOLOData:
         if not data_pairs:
             print(f"❌ [ERROR] No images+labels found in {input_dir}")
             return
-        # Duplicate or subsample dataset according to data_factor
+        #copy randomly images and labels from input_dir to input_dir to create data factor
         dataset_length = len(data_pairs)
         if data_factor > 1.0:
             extra_count = int(dataset_length * (data_factor - 1))
             print(f"✅ [INFO] Data factor > 1.0, adding {extra_count} extra samples (×{data_factor} total).")
+            # sample with replacement
             extra_pairs = random.choices(data_pairs, k=extra_count)
             data_pairs = data_pairs + extra_pairs
         elif data_factor < 1.0:
@@ -257,7 +248,6 @@ class YOLOData:
             bboxes_yolo = []
             class_labels = []
             for line in lines:
-                # Read label in YOLO format (cls_id x_center y_center width height)
                 parts = line.split()
                 if len(parts) != 5:
                     continue
@@ -274,7 +264,6 @@ class YOLOData:
             if len(bboxes_yolo) == 0:
                 print(f"⚠️ [WARN] No boxes in {lbl_path}, skipping.")
                 continue
-            # Apply augmentation
             transformed = transform(
                 image=image_rgb,
                 bboxes=bboxes_yolo,
@@ -286,7 +275,6 @@ class YOLOData:
             if len(aug_boxes) == 0:
                 print(f"⚠️ [INFO] Aug transform removed all boxes from {img_path}. Skipping.")
                 continue
-            # Save augmented image and label
             base_in = os.path.splitext(os.path.basename(img_path))[0]
             aug_img_name = f"{base_in}_aug_{i}.png"
             aug_lbl_name = f"{base_in}_aug_{i}.txt"
@@ -298,8 +286,6 @@ class YOLOData:
                     f.write(f"{cls_id} {xc:.6f} {yc:.6f} {ww:.6f} {hh:.6f}\n")
             saved_pairs.append((aug_img_path, aug_lbl_path))
         print(f"✅ [INFO] Saved {len(saved_pairs)} augmented pairs into {output_dir}.")
-
-        # Visualize random samples of the augmented dataset
         if len(saved_pairs) == 0:
             print("⚠️ [INFO] No saved pairs to display.")
             return
@@ -341,10 +327,10 @@ class YOLOData:
 
     def create_yaml(self, output_path, train_path=None, val_path=None, names=None, check_split=False):
         """
-        Writes a data.yaml for YOLO training. Optionally, can force a new 80/20 train/val split
-        if the validation set is too small.
+        Writes a YOLO data.yaml listing train/val dirs and class names.
+        If val set is too small compared to train, a new split is created (80/20).
         """
-        # Resolve provided paths, or fall back to object's train/val dirs
+        # Resolve paths
         train_path = train_path or self.train_dir
         val_path = val_path or self.val_dir
 
@@ -356,7 +342,7 @@ class YOLOData:
         train_imgs = sorted([f for f in os.listdir(train_img_dir) if f.endswith((".png", ".jpg", ".jpeg"))])
         val_imgs = sorted([f for f in os.listdir(val_img_dir) if f.endswith((".png", ".jpg", ".jpeg"))])
 
-        # Optionally, re-split to 80/20 if val set is too small
+        # Automatically re-split if val < 20% of train
         if len(val_imgs) < 0.2 * (len(train_imgs)+len(val_imgs)):
             if not check_split:
                 LOGGER.warning(f"⚠️ Validation set too small: {len(val_imgs)} < 20% of {len(train_imgs)}. but check_split is False, skipping re-split.")
@@ -370,7 +356,7 @@ class YOLOData:
                 val_pairs = all_pairs[:val_count]
                 train_pairs = all_pairs[val_count:]
 
-                # Create new temp train/val directories
+                # Create temp dirs
                 train_temp = train_path + "_temp"
                 val_temp = val_path + "_temp"
                 for d in [train_temp, val_temp]:
@@ -389,14 +375,14 @@ class YOLOData:
                 copy_pair(train_pairs, train_img_dir, train_lbl_dir, train_temp)
                 copy_pair(val_pairs, train_img_dir, train_lbl_dir, val_temp)
 
-                # Update paths to new split
+                # Update paths
                 train_path = train_temp
                 val_path = val_temp
                 self.train_dir = train_temp
                 self.val_dir = val_temp
                 LOGGER.info(f"✅ New split created: {len(train_pairs)} train, {len(val_pairs)} val")
 
-        # Generate and save YAML file
+        # Write the YAML file
         data = {
             'train': train_path,
             'val': val_path,
@@ -410,10 +396,6 @@ class YOLOData:
         return output_path
 
     def load_data(folder):
-        """
-        Static method to load paired lists of (image_path, label_path) from YOLO-style folders.
-        Returns only pairs where both image and label exist.
-        """
         images_dir = os.path.join(folder, "images")
         labels_dir = os.path.join(folder, "labels")
         image_files = sorted([f for f in os.listdir(images_dir) if f.lower().endswith((".png", ".jpg", ".jpeg"))])
@@ -427,18 +409,14 @@ class YOLOData:
                               os.path.join(labels_dir, lbl_name)))
         return pairs
 
-# ──────────────────────────────────────────────────────────────
-# Training utilities
-# ──────────────────────────────────────────────────────────────
-
+# ─── Training ──────────────────────────────────────────────────────────────────
 def train_model(control, yaml_path):
-    """
-    Trains a YOLO model using Ultralytics YOLO Python API and parameters in control dict.
-    """
     s = control['train_settings']
     model = YOLO(s['model_type'])
     LOGGER.info(f"Training {s['model_type']} for {s['epochs']} epochs…")
-    # Start training
+    # model.train(data=yaml_file, epochs=epochs, batch=batch_size, device=device, cos_lr=True, dropout=drpout,
+    #             workers=workers, name=model_name, pretrained=pretrained, cls=cls, box=box, dfl=dfl,
+    #             augment=yolo_augment, freeze=freeze)
     model.train(
         data      = yaml_path,
         epochs    = s['epochs'],
@@ -451,36 +429,32 @@ def train_model(control, yaml_path):
         dropout=    s['dropout'],  # Set to 0.0 if not using dropout
         project   = s['project'],
     )
-    # Run validation at end of training and save metrics
     model.val(data=yaml_path, save_json=True, save_txt=True, conf = 0.8)
     LOGGER.info("Training completed.")
 
-# ──────────────────────────────────────────────────────────────
-# Main script logic
-# ──────────────────────────────────────────────────────────────
-
+# ─── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    # Set up device for training (GPU or CPU)
+    #%% set device
     if torch.cuda.is_available():
         device = "0"
         torch.multiprocessing.set_sharing_strategy('file_system')
     else:
         device = "cpu"
     print("device", device)
-    current_folder = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    current_folder = os.path.dirname(os.path.abspath(__file__))
     print("current_folder", current_folder)
-    # Define all paths and parameters in one dictionary
     CONTROL = {
         'folders': {
             'main': current_folder,
-            'main_train_folder': os.path.join(current_folder, "train_data"),
-            'train': os.path.join(current_folder, "train_data", "train"),
-            'val': os.path.join(current_folder, "train_data", "val"),
-            'all_train_data': os.path.join(current_folder, "train_data", "all_train"),
-            'labeld_data': os.path.join(current_folder, "train_data", "labeld_data"),
+            'main_train_folder': os.path.join(current_folder, "Data"),
+            'train': os.path.join(current_folder, "Data", "train"),
+            'val': os.path.join(current_folder, "Data", "val"),
+            'all_train_data': os.path.join(current_folder, "Data", "all_train"),
+            'labeld_data': os.path.join(current_folder, "Data", "labeld_data"),
+
             'video1': os.path.join(current_folder, "video_output_20_2_24_1"),
             'video2': os.path.join(current_folder, "video_output_4_2_24_B_2"),
-            'augmented': os.path.join(current_folder, "train_data", "augmented_dataset"),
+            'augmented': os.path.join(current_folder, "Data", "augmented_dataset"),
         },
         'train_settings': {
             'model_type': 'yolo11m',
@@ -492,40 +466,62 @@ if __name__ == '__main__':
             'freeze':     9,
             'cos_lr': True,  # Use cosine learning rate scheduler
             'dropout': 0.1,  # Set to 0.0 if not using dropout
-            'project': 'aug_test'
+            'project': 'post_videos'
         }
     }
 
-    # Build data.yaml for YOLO and start training
     yaml_path = os.path.join(CONTROL['folders']['main_train_folder'], 'data.yaml')
     ydata = YOLOData(CONTROL)
+    #pre - video
+    # debug_image = os.path.join(CONTROL['folders']['labeld_data'], 'images', '1c0b1584-frame_1789.jpg')
+    # debug_label = os.path.join(CONTROL['folders']['labeld_data'], 'labels', '1c0b1584-frame_1789.txt')
+    #
+    # ydata.debug_load_images_and_labels(image_path= debug_image, label_path=debug_label)
+    # copy_folders = [CONTROL['folders']['labeld_data']]
+    # training_path = CONTROL['folders']['all_train_data']
+    # ydata.copy_data(input_folders=copy_folders,output_folder=training_path, delete_existing=True)
+    # CONTROL['folders']['train'] = training_path
+    # # ydata.apply_augmentation(CONTROL['folders']['train'], CONTROL['folders']['augmented'], show_number=5, p=0.5, data_factor=6, p_noise=0.2)
+    # # CONTROL['folders']['train'] = CONTROL['folders']['augmented']
+    # yaml_file = ydata.create_yaml(
+    #     output_path= yaml_path,
+    #     train_path = CONTROL['folders']['train'],
+    #     val_path   = CONTROL['folders']['val'],
+    #     names      = ['Empty', 'Tweezers', 'Needle_driver'],
+    #     check_split = False
+    # )
+    #
+    # CONTROL['train_settings']['model_name'] = 'yolo11n_no_augmented'
+    # CONTROL['train_settings']['model_type'] = 'yolo11n'
+    # train_model(CONTROL, yaml_file)
+    # CONTROL['train_settings']['model_name'] = 'yolo11s_no_augmented'
+    # CONTROL['train_settings']['model_type'] = 'yolo11s'
+    # train_model(CONTROL, yaml_file)
+    # CONTROL['train_settings']['model_name'] = 'yolo11m_no_augmented'
+    # CONTROL['train_settings']['model_type'] = 'yolo11m'
+    # train_model(CONTROL, yaml_file)
 
-    # Merge labeled folders to one dataset
-    copy_folders = [CONTROL['folders']['labeld_data']]
+    #post - video
+    copy_folders = [CONTROL['folders']['labeld_data'], CONTROL['folders']['video1'], CONTROL['folders']['video2']]
     training_path = CONTROL['folders']['all_train_data']
     ydata.copy_data(input_folders=copy_folders,output_folder=training_path, delete_existing=True)
     CONTROL['folders']['train'] = training_path
-
-    # Uncomment for augmentation step
-    # ydata.apply_augmentation(CONTROL['folders']['train'], CONTROL['folders']['augmented'], show_number=5, p=0.5, data_factor=6, p_noise=0.2)
+    ydata.apply_augmentation(CONTROL['folders']['train'], CONTROL['folders']['augmented'], show_number=0, p=0.2, data_factor=2, p_noise=0.2)
     CONTROL['folders']['train'] = CONTROL['folders']['augmented']
-
-    # Create the YAML config for YOLO training
     yaml_file = ydata.create_yaml(
         output_path= yaml_path,
         train_path = CONTROL['folders']['train'],
         val_path   = CONTROL['folders']['val'],
         names      = ['Empty', 'Tweezers', 'Needle_driver'],
-        check_split = False
+        check_split = True
     )
 
-    # Train several model variants with different sizes
-    CONTROL['train_settings']['model_name'] = 'yolo11n_augmented'
-    CONTROL['train_settings']['model_type'] = 'yolo11n'
-    train_model(CONTROL, yaml_file)
-    CONTROL['train_settings']['model_name'] = 'yolo11s_augmented'
+    # CONTROL['train_settings']['model_name'] = 'yolo11n_no_augmented'
+    # CONTROL['train_settings']['model_type'] = 'yolo11n'
+    # train_model(CONTROL, yaml_file)
+    CONTROL['train_settings']['model_name'] = 'yolo11s_post_videos'
     CONTROL['train_settings']['model_type'] = 'yolo11s'
     train_model(CONTROL, yaml_file)
-    CONTROL['train_settings']['model_name'] = 'yolo11m_augmented'
-    CONTROL['train_settings']['model_type'] = 'yolo11m'
-    train_model(CONTROL, yaml_file)
+    # CONTROL['train_settings']['model_name'] = 'yolo11m_no_augmented'
+    # CONTROL['train_settings']['model_type'] = 'yolo11m'
+    # train_model(CONTROL, yaml_file)

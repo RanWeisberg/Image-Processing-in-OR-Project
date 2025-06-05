@@ -5,7 +5,7 @@ import random
 import matplotlib.pyplot as plt
 
 # === CONFIGURATION ===
-DATASET_DIR = 'labeled_image_data'
+DATASET_DIR = 'Part 1/labeled_image_data'
 PLOT_DIR = os.path.join(DATASET_DIR, 'distribution_plots')
 IMAGE_EXT = '.jpg'
 SETS = ['train', 'val']
